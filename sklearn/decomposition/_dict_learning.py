@@ -630,7 +630,7 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
                          random_state=None, return_inner_stats=False,
                          inner_stats=None, return_n_iter=False,
                          positive_dict=False, positive_code=False,
-                         method_max_iter=1000):
+                         method_max_iter=1000, X_test = None):
     """Solves a dictionary learning matrix factorization problem online.
 
     Finds the best dictionary and the corresponding sparse code for
@@ -753,6 +753,8 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
     MiniBatchSparsePCA
 
     """
+
+    
     if n_components is None:
         n_components = X.shape[1]
 
@@ -813,12 +815,8 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
     # If n_iter is zero, we need to return zero.
     ii = iter_offset - 1
 
-    loss = []
-    code = sparse_encode(X, dictionary.T, algorithm=method, alpha=alpha,
-                             n_jobs=n_jobs, check_input=False,
-                             positive=positive_code, max_iter=method_max_iter,
-                             verbose=verbose)
-    loss.append(get_loss(X, code, dictionary.T, alpha))
+    time_loss = []
+    loss_test = []
     for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
         this_X = X_train[batch]
         dt = (time.time() - t0)
@@ -855,12 +853,18 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
         # XXX: Can the residuals be of any use?
 
 
-        code = sparse_encode(X, dictionary.T, algorithm=method, alpha=alpha,
+        if ii%1000 == 0:
+            code = sparse_encode(X, dictionary.T, algorithm=method, alpha=alpha,
                              n_jobs=n_jobs, check_input=False,
                              positive=positive_code, max_iter=method_max_iter,
                              verbose=verbose)
-        loss.append(get_loss(X, code, dictionary.T, alpha))
-        
+            time_loss.append((time.time() - t0, get_loss(X, code, dictionary.T, alpha)))
+            if X_test is not None:
+                code_test = sparse_encode(X_test, dictionary.T, algorithm=method, alpha=alpha,
+                             n_jobs=n_jobs, check_input=False,
+                             positive=positive_code, max_iter=method_max_iter,
+                             verbose=verbose)
+                loss_test.append(get_loss(X_test, code_test, dictionary.T, alpha))
         # Maybe we need a stopping criteria based on the amount of
         # modification in the dictionary
         if callback is not None:
@@ -886,8 +890,16 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
         if return_n_iter:
             return code, dictionary.T, ii - iter_offset + 1
         else:
-            loss.append(get_loss(X, code, dictionary.T, alpha))
-            return code, dictionary.T, loss
+            time_loss.append((time.time() - t0, get_loss(X, code, dictionary.T, alpha)))
+            if X_test is not None:
+                code_test = sparse_encode(X_test, dictionary.T, algorithm=method, alpha=alpha,
+                             n_jobs=n_jobs, check_input=False,
+                             positive=positive_code, max_iter=method_max_iter,
+                             verbose=verbose)
+                loss_test.append(get_loss(X_test, code_test, dictionary.T, alpha))
+                return code, dictionary.T, time_loss, loss_test
+
+            return code, dictionary.T, time_loss
 
     if return_n_iter:
         return dictionary.T, ii - iter_offset + 1

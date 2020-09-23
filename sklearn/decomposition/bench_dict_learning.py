@@ -14,6 +14,61 @@ from sklearn.decomposition._dict_learning_na import sparse_encode_na,\
 
 
 
+
+def create_rank_k_dataset(
+                        n_samples=500,
+                        n_features=200,
+                        rank=4,
+                        fraction_missing=0.1,
+                        symmetric=False,
+                        random_seed=0):
+
+    np.random.seed(random_seed)
+    U = np.random.randn(n_samples, rank)
+    V = np.random.randn(rank, n_features)
+
+    X = np.dot(U, V)
+
+    missing_raw_values = np.random.uniform(0, 1, (n_samples, n_features))
+    missing_mask = missing_raw_values < fraction_missing
+    missing_mask[1,1] = 1
+
+    X_incomplete = X.copy()
+    # fill missing entries with NaN
+    X_incomplete[missing_mask] = np.nan
+
+    return X, X_incomplete, missing_mask
+
+def bench_loss(n_samples = 300, n_features = 200, rank = 4, n_components = 4,
+               alpha = 1, bench_time = False):
+
+    X, X_na, missing_mask = create_rank_k_dataset(n_samples=n_samples, n_features=n_features, rank=rank)
+
+
+    _, _, time_loss = dict_learning_na(X, n_components = n_components,
+                                            alpha=alpha, ro = 2, T = 300)
+
+    _, _, time_loss_sklearn = dict_learning_online(X, n_components = n_components,
+                                            alpha=alpha, batch_size=1, n_iter=100)
+
+
+    if bench_time:
+        plt.plot([x[0] for x in time_loss], [x[1] for x in time_loss], label = 'thom')
+        plt.plot([x[0] for x in time_loss_sklearn], [x[1] for x in time_loss_sklearn], '*', label = 'sklearn', ms = 7)
+        plt.xlabel('time (s)')
+    else:
+        plt.plot([x[1] for x in time_loss], label = 'thom')
+        plt.plot(np.array(range(len(time_loss_sklearn)))*3, [x[1] for x in time_loss_sklearn], '*', label = 'sklearn', ms = 7)
+        plt.xlabel('n_iter')
+
+    plt.legend()
+    plt.title(f'n_samples={n_samples}, n_feat={n_features}, rank={rank}, n_comp={n_components}')
+    plt.ylabel('loss')
+    
+    return time_loss, time_loss_sklearn
+
+
+
 n_samples, n_features = 50, 25
 rank = 12
 np.random.seed(42)
@@ -29,34 +84,48 @@ n_components = 11
 code, dict_, loss_sklearn = dict_learning_online(X, n_components = n_components,
                                    alpha = .0001)
 
-def bench_loss(n_samples = 50, n_features = 25,
-               rank = 12, n_components = 11, alpha = 1):
+# def bench_loss(n_samples = 300, n_features = 200,
+#                rank = 4, n_components = 4, alpha = 1, 
+#                n_samples_test = 1000, bench_time = True):
 
 
-    U = np.random.randn(n_samples, rank)
-    V = np.random.randn(rank, n_features)
-    X = np.dot(U, V) + 77
+#     U = np.random.randn(n_samples + n_samples_test, rank)
+#     V = np.random.randn(rank, n_features)
+#     X = np.dot(U, V)
 
-    X_na = X.copy()
-    X_na[0,0] = np.nan
-    X_na[1,1] = np.nan
+#     X, X_test = X[:n_samples], X[n_samples:]
+#     X_na = X.copy()
+#     X_na[0,0] = np.nan
+#     X_na[1,1] = np.nan
 
-    for ro in [1, 2, 5, 32]:
-        code_na, D, loss = dict_learning_na(X, n_components = n_components,
-                                            alpha=alpha, ro = ro)
-        plt.plot(loss, label = str(ro))
+#     all_loss = []
+#     for ro in [2]:
+#         _, _, time_loss, loss_test = dict_learning_na(X, n_components = n_components,
+#                                             alpha=alpha, ro = ro, X_test = X_test, T = 300)
+#         if bench_time:
+#             plt.plot([x[0] for x in time_loss], [x[1] for x in time_loss], label = 'thom')
+#         else:
+#             plt.plot([x[1] for x in time_loss], label = 'thom')
+#         plt.plot(loss_test, '--', label = '' + ' test')
+#         all_loss.append(time_loss)
 
-    code, D, loss_sklearn = dict_learning_online(X, n_components = n_components,
-                                            alpha=alpha, batch_size=1, n_iter=150)
-
-    # loss_sklearn = np.mean(np.abs(X - np.dot(code, D)))
-    plt.plot(loss_sklearn, '*', label = 'sklearn', ms = 7)
-    plt.legend()
-    plt.title('loss for dict learning na')
-    plt.ylabel('loss')
-    plt.ylim((min(loss_sklearn)*.8, max(loss_sklearn)*1.3))
-    # plt.yscale('log')
-    # plt.xscale('log')
+#     _, _, time_loss_sklearn, loss_sklearn_test = dict_learning_online(X, n_components = n_components,
+#                                             alpha=alpha, batch_size=1, n_iter=300, X_test = X_test)
+#     all_loss.append(time_loss_sklearn)
+    
+#     if bench_time:
+#         plt.plot([x[0] for x in time_loss_sklearn], [x[1] for x in time_loss_sklearn], '*', label = 'sklearn', ms = 7)
+#     else:
+#         plt.plot([x[1] for x in time_loss_sklearn], '*', label = 'sklearn', ms = 7)
+#     plt.plot(loss_sklearn_test, '--', label = 'sklearn test')
+#     plt.legend()
+#     plt.title(f'n_samples={n_samples}, n_feat={n_features}, rank={rank}, n_comp={n_components}')
+#     plt.ylabel('loss')
+#     plt.xlabel('time (s)')
+#     # plt.ylim((min(loss_sklearn)*.8, max(loss_sklearn)*1.3))
+#     # plt.yscale('log')
+#     # plt.xscale('log')
+#     return all_loss
 
 def bench_dict_learning():
     
@@ -66,7 +135,7 @@ def bench_dict_learning():
 
         to = time.time()
         for _ in range(n_iter):
-            code, D = dict_learning_online(X, n_components = n_components)
+            code, D, loss_sk = dict_learning_online(X, n_components = n_components)
         t1 = time.time()
         print('dict_learning took:\t', (t1 - to)/n_iter, 'seconds')
         t = (t1 - to)/n_iter
@@ -99,7 +168,7 @@ def bench_sparse_encode(n_samples = 100, n_features=50, n_iter = 10):
     
     def get_time_sparse():
         X = np.random.randn(n_samples, n_features)
-        code, dict_ = dict_learning_online(X, n_components = 12, alpha = 1)
+        code, dict_, loss_sk = dict_learning_online(X, n_components = 12, alpha = 1)
 
         to = time.time()
         for _ in range(n_iter):
