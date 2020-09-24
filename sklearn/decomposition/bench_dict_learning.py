@@ -15,7 +15,24 @@ from sklearn.decomposition._dict_learning_na import sparse_encode_na,\
 from sklearn.decomposition._dict_learning import get_loss
 
 
+from sklearn.datasets import fetch_openml
+
 def create_mnist_dataset(fraction_missing=0.1):
+
+    mnist = fetch_openml(data_id = 554)
+    X = mnist.data
+    
+    missing_raw_values = np.random.uniform(0, 1, X.shape)
+    missing_mask = missing_raw_values < fraction_missing
+    missing_mask[1,1] = 1
+
+    X_incomplete = X.copy()
+    # fill missing entries with NaN
+    X_incomplete[missing_mask] = np.nan
+
+    return X, X_incomplete, missing_mask
+
+def create_digits_dataset(fraction_missing=0.1):
 
     from sklearn.datasets import load_digits
 

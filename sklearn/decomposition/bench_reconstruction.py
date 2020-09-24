@@ -11,7 +11,7 @@ from sklearn.decomposition._dict_learning_na import sparse_encode_na,\
                                             update_dict_na, get_code_dict_learning_na,\
                                                 reconstruction_error
                                             
-from sklearn.decomposition.bench_dict_learning import create_rank_k_dataset, create_mnist_dataset
+from sklearn.decomposition.bench_dict_learning import create_rank_k_dataset, create_mnist_dataset, create_digits_dataset
 
 from fancyimpute import MatrixFactorization
 from fancyimpute import KNN, NuclearNormMinimization, SoftImpute, BiScaler
@@ -23,9 +23,13 @@ def bench_reconstruction(data = 'generated', n_samples = 4000, n_features = 200,
         l_components = [8,10,12]
         plt.title('generated data X = U*V (rank=10)')
         X, X_na, missing_mask = create_rank_k_dataset(n_samples=n_samples, n_features=n_features, rank=rank)
-    elif data == 'mnist':
+    elif data == 'digits':
         l_components = [5,10,15]
-        plt.title('Mnist data (1800 * 64)')
+        plt.title('digits data (1800 * 64)')
+        X, X_na, missing_mask = create_digits_dataset(fraction_missing=0.1)
+    elif data == 'mnist':
+        l_components = [5,10,15,25,40]
+        plt.title('MNIST data (70,000 * 784)')
         X, X_na, missing_mask = create_mnist_dataset(fraction_missing=0.1)
     else:
         raise
