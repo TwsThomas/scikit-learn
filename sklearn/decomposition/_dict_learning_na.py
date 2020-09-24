@@ -40,8 +40,8 @@ def reconstruction_error(XY, XY_completed, missing_mask, name=None, verbose = 1)
         for (i, j, x, xr) in value_pairs[:10]:
             print("  (%d,%d)  %0.4f ~= %0.4f" % (i, j, x, xr))
     diffs = [actual - predicted for (_, _, actual, predicted) in value_pairs]
-    missing_mse = np.mean([diff ** 2 for diff in diffs])
-    missing_mae = np.mean([np.abs(diff) for diff in diffs])
+    missing_mse = np.mean([diff ** 2 for diff in diffs]) / np.mean([actual ** 2 for (_,_,actual,_) in value_pairs])
+    missing_mae = np.mean([np.abs(diff) for diff in diffs]) / np.mean([np.abs(actual) for (_,_,actual,_) in value_pairs])
     if verbose:
         print("%sMSE: %0.4f, MAE: %0.4f" % (
               "" if not name else name + " ",
@@ -49,7 +49,7 @@ def reconstruction_error(XY, XY_completed, missing_mask, name=None, verbose = 1)
               missing_mae))
     return missing_mse, missing_mae
 
-def get_loss_na(X, X_na, code, dictionary, alpha):
+def get_loss_na(X, X_na, code, dictionary):
 
     X_new = np.dot(code, dictionary)
     missing_mask = np.isnan(X_na)
@@ -146,7 +146,7 @@ def dict_learning_na(X, n_components=12, alpha=1, ro = .01,
     e = np.zeros((n_components, n_features))
     
     loss = [] # record loss
-    loss.append(get_loss(X, code, D.T, alpha))
+    # loss.append(get_loss(X, code, D.T, alpha))
 
     for t in range(1, T + 1):
         ii = t%n_samples
@@ -179,3 +179,10 @@ def dict_learning_na(X, n_components=12, alpha=1, ro = .01,
 
     code = sparse_encode_na(Xo, observed_mask, D.T, alpha)
     return code, D.T, loss
+
+def get_code_dict_learning_na(X_na, D, alpha):
+
+    observed_mask = np.logical_not(_get_mask(X_na, np.nan))
+    Xo = np.nan_to_num(X_na)
+    code = sparse_encode_na(Xo, observed_mask, D, alpha)
+    return code
